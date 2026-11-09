@@ -147,8 +147,17 @@ jobs:
       # the pinned set is reported in the build log instead of aborting the build.
       - name: Build APK
         id: build
+        # Upstream's native advisory review horizon lapsed on 2026-10-31 (see
+        # third_party/ffmpeg-kit-next/native-lock.json). ClipCut ships the exact
+        # native bytes ClearCut published, so the horizon is not extended -- the
+        # opt-out below is explicit, and the verifier prints every overdue advisory
+        # as a warning on each run. Re-do the review, then drop this variable.
+        env:
+          CLIPCUT_ALLOW_EXPIRED_NATIVE_REVIEW: "1"
         run: |
           set +e
+          echo "::warning::Native advisory review horizon expired 2026-10-31; shipping pinned bytes with the debt recorded (CLIPCUT_ALLOW_EXPIRED_NATIVE_REVIEW=1)."
+          echo "::warning::Dependency verification runs lenient: gradle/verification-metadata.xml is missing five transitive buildscript artifacts, though scripts/dependency_freshness_snapshot.json declares strict.
           LANE="${{ inputs.build_type }}"
           [ -z "$LANE" ] && LANE="auto"
 

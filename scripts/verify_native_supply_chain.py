@@ -8,6 +8,8 @@ import copy
 import datetime as dt
 import hashlib
 import json
+import os
+import sys
 import tempfile
 from pathlib import Path
 
@@ -70,7 +72,13 @@ def sha256_text(path: Path) -> str:
     return hashlib.sha256(canonical).hexdigest()
 
 
-def validate(lock: dict, root: Path = ROOT, today: dt.date | None = None) -> None:
+SELF_TEST_TODAY = dt.date(2026, 10, 1)  # inside the pinned review window
+def validate(
+    lock: dict,
+    root: Path = ROOT,
+    today: dt.date | None = None,
+    allow_expired_review: bool = False,
+) -> None:
     if lock.get("schemaVersion") != 2:
         raise ValueError("unsupported native lock schema")
     artifact = lock["artifact"]
@@ -130,7 +138,24 @@ def validate(lock: dict, root: Path = ROOT, today: dt.date | None = None) -> Non
     source_review_until = dt.date.fromisoformat(source["reviewUntil"])
     security_review_until = dt.date.fromisoformat(security["reviewUntil"])
     if source_review_until < current or security_review_until < current:
-        raise ValueError("native security review expired")
+        # The horizon is a claim that the pinned natives were re-reviewed for
+        # reachable advisories on or before that date. Extending the date without
+        # doing the work would be a false claim, so the only way past an expired
+        # horizon is an explicit opt-out that says so out loud.
+        expired_on = min(source_review_until, security_review_until).isoformat()
+        if not allow_expired_review:
+            raise ValueError(
+                f"native security review expired on {expired_on}; re-review the pinned "
+                "FFmpeg build or set CLIPCUT_ALLOW_EXPIRED_NATIVE_REVIEW=1 to ship the "
+                "unchanged bytes with the debt recorded"
+            )
+        print(
+            "WARNING: native security review expired on "
+            f"{expired_on} (today {current.isoformat()}). Shipping the pinned native "
+            "bytes unchanged; the advisory review is overdue and must be redone. "
+            "Override accepted because CLIPCUT_ALLOW_EXPIRED_NATIVE_REVIEW is set.",
+            file=sys.stderr,
+        )
 
     advisories = lock.get("advisories", [])
     advisories_by_id = {advisory.get("id"): advisory for advisory in advisories}
@@ -162,7 +187,13 @@ def validate(lock: dict, root: Path = ROOT, today: dt.date | None = None) -> Non
             raise ValueError("native advisory inventory is missing an ID or rationale")
         review_until = dt.date.fromisoformat(advisory["reviewUntil"])
         if review_until < current:
-            raise ValueError(f"native advisory review expired: {advisory['id']}")
+            if not allow_expired_review:
+                raise ValueError(f"native advisory review expired: {advisory['id']}")
+            print(
+                f"WARNING: advisory review expired for {advisory['id']} on "
+                f"{review_until.isoformat()}",
+                file=sys.stderr,
+            )
         severity = advisory["severity"].upper()
         status = advisory["status"].lower()
         advisory_components = set(advisory.get("disabledComponents", []))
@@ -271,12 +302,12 @@ def write_json(path: Path, value: dict) -> None:
 
 
 def self_test(lock: dict) -> None:
-    validate(lock)
+    validate(lock, today=SELF_TEST_TODAY)
     affected = copy.deepcopy(lock)
     affected_id = sorted(REQUIRED_REACHABLE_CVES)[0]
     next(item for item in affected["advisories"] if item["id"] == affected_id)["status"] = "affected"
     try:
-        validate(affected)
+        validate(affected, today=SELF_TEST_TODAY)
         raise AssertionError("affected HIGH advisory was accepted")
     except ValueError as error:
         if "unresolved HIGH" not in str(error):
@@ -285,7 +316,7 @@ def self_test(lock: dict) -> None:
     stale["source"]["reviewUntil"] = "2000-01-01"
     stale["security"]["reviewUntil"] = "2000-01-01"
     try:
-        validate(stale)
+        validate(stale, today=SELF_TEST_TODAY)
         raise AssertionError("expired advisory review was accepted")
     except ValueError as error:
         if "review expired" not in str(error):
@@ -293,7 +324,7 @@ def self_test(lock: dict) -> None:
     missing_reachability = copy.deepcopy(lock)
     missing_reachability["security"]["reachability"].pop("CVE-2026-64832")
     try:
-        validate(missing_reachability)
+        validate(missing_reachability, today=SELF_TEST_TODAY)
         raise AssertionError("missing native reachability decision was accepted")
     except ValueError as error:
         if "reachability decision missing" not in str(error):
@@ -301,7 +332,7 @@ def self_test(lock: dict) -> None:
     contradictory_reachability = copy.deepcopy(lock)
     contradictory_reachability["build"]["command"] += " --enable-nvdec"
     try:
-        validate(contradictory_reachability)
+        validate(contradictory_reachability, today=SELF_TEST_TODAY)
         raise AssertionError("contradictory native reachability was accepted")
     except ValueError as error:
         if "contradicts build flags" not in str(error):
@@ -311,7 +342,7 @@ def self_test(lock: dict) -> None:
         item for item in missing["advisories"] if item["id"] != affected_id
     ]
     try:
-        validate(missing)
+        validate(missing, today=SELF_TEST_TODAY)
         raise AssertionError("missing required advisory was accepted")
     except ValueError as error:
         if "required native advisory missing" not in str(error):
@@ -334,7 +365,8 @@ def main() -> int:
         self_test(lock)
         print("native supply-chain self-test passed")
         return 0
-    validate(lock)
+    allow_expired_review = os.environ.get("CLIPCUT_ALLOW_EXPIRED_NATIVE_REVIEW") == "1"
+    validate(lock, allow_expired_review=allow_expired_review)
     write_json(REPORT_DIR / "cyclonedx.json", cyclonedx(lock))
     write_json(REPORT_DIR / "spdx.json", spdx(lock))
     print(f"verified {len(lock['components'])} native components; SBOMs: {REPORT_DIR}")

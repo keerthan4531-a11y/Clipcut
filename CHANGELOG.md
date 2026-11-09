@@ -15,6 +15,12 @@
 - Everything underneath is ClearCut 3.82.0 unchanged: the editing engine, AI models,
   exporters and their behaviour are identical to the upstream release. See the entries
   below for the feature history ClipCut inherits.
+- Two inherited CI gates are recorded as debt rather than quietly relaxed. The pinned
+  native advisory review horizon expired on 2026-10-31; ClipCut ships ClearCut's exact
+  native bytes, so the build takes an explicit `CLIPCUT_ALLOW_EXPIRED_NATIVE_REVIEW=1`
+  opt-out that prints every overdue advisory on each run instead of extending the date.
+  Dependency verification also runs lenient in CI, because the pinned metadata has no
+  entry for five transitive buildscript artifacts.
 - Upstream copyright and MIT licence are preserved; see `LICENSE` and `NOTICE`.
 
 ## Unreleased
