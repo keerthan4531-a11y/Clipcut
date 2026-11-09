@@ -3,7 +3,7 @@ index 24428f6..0ca135c 100755
 --- a/scripts/android/ffmpeg.sh
 +++ b/scripts/android/ffmpeg.sh
 @@ -365,0 +366,16 @@ fi
-+# ClipCut security profile: media formats covered by the current FFmpeg
++# ClearCut security profile: media formats covered by the current FFmpeg
 +# advisories are deliberately unavailable in the shipped Android build.
 +# Keep this list explicit so the configure transcript and the native lock can
 +# be compared during release review.

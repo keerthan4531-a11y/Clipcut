@@ -1,9 +1,9 @@
 {
   "benchmarks": [
     {
-        "iterations": 5,
-        "metrics": {
-          "timeToInitialDisplayMs": {
+      "iterations": 5,
+      "metrics": {
+        "timeToInitialDisplayMs": {
           "coefficientOfVariation": 0.07521424211218723,
           "maximum": 1630.4185,
           "median": 1576.9466,
@@ -79,7 +79,7 @@
   "profile": {
     "lineCount": 30384,
     "path": "app/src/main/baseline-prof.txt",
-    "sha256": "fe6c2d46d158b17ea65f39abbcde3dfebc9a42dbd6f62f79513284b3d84fc627"
+    "sha256": "002735f848c786b0e6d250cb9cf323a31412e5c86f390beebd520f44c8c2c723"
   },
   "schemaVersion": 1
 }
