@@ -1,0 +1,62 @@
+{
+  "schemaVersion": 1,
+  "publicProductName": "ClipCut",
+  "retiredPublicProductName": "ClearCut",
+  "applicationId": "com.clipcut.editor",
+  "namespace": "com.clipcut.editor",
+  "sourcePackage": "com.clipcut.editor",
+  "migrationPolicy": {
+    "applicationId": "retain-existing-lineage",
+    "namespace": "retain-existing-lineage",
+    "signingCertificate": "retain-pinned-release-identity",
+    "identityChange": "new-install-with-explicit-export-import"
+  },
+  "nonReleaseVariants": {
+    "streaming": {
+      "applicationIdSuffix": ".streaming",
+      "purpose": "local-debug-network-streaming"
+    }
+  },
+  "providerAuthorities": [
+    "${applicationId}.androidx-startup",
+    "${applicationId}.fileprovider"
+  ],
+  "shortcutTarget": {
+    "package": "com.clipcut.editor",
+    "class": "com.clipcut.editor.MainActivity",
+    "actions": [
+      "com.clipcut.editor.action.NEW_PROJECT",
+      "com.clipcut.editor.action.OPEN_RECENT"
+    ]
+  },
+  "archiveAssociations": {
+    "extensions": [
+      ".clipcut",
+      ".clipcut-template"
+    ],
+    "mimeTypes": [
+      "application/octet-stream",
+      "application/json",
+      "application/zip",
+      "application/xml",
+      "text/xml",
+      "text/plain"
+    ]
+  },
+  "publicSurfacePaths": [
+    "README.md",
+    "docs/privacy-policy.md",
+    "docs/play-data-safety.md",
+    "fastlane/metadata/android/en-US/title.txt",
+    "fastlane/metadata/android/en-US/short_description.txt",
+    "fastlane/metadata/android/en-US/full_description.txt",
+    "fastlane/metadata/android/es-ES/title.txt",
+    "fastlane/metadata/android/es-ES/short_description.txt",
+    "fastlane/metadata/android/es-ES/full_description.txt"
+  ],
+  "readmePolicyPhrases": [
+    "### Package identity and upgrade policy",
+    "`com.clipcut.editor`",
+    "new install with an explicit export/import path"
+  ]
+}

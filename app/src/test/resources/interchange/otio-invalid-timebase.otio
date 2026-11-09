@@ -1,0 +1,15 @@
+{
+  "OTIO_SCHEMA": "Timeline.1",
+  "name": "Invalid timebase fixture",
+  "metadata": {
+    "clipcut_otio_schema_version": "0.16",
+    "clipcut_otio_adapter_range": "0.15-0.16",
+    "clipcut_timebase_numerator": 0,
+    "clipcut_timebase_denominator": 0
+  },
+  "tracks": {
+    "OTIO_SCHEMA": "Stack.1",
+    "name": "tracks",
+    "children": []
+  }
+}

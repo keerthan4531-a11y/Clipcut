@@ -1,0 +1,44 @@
+<svg width="1000" height="1000" viewBox="0 0 1000 1000" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="ClipCut app mark">
+  <title>ClipCut mark</title>
+  <defs>
+    <linearGradient id="plate" x1="0" y1="0" x2="1000" y2="1000" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#131A30"/>
+      <stop offset="1" stop-color="#080C1A"/>
+    </linearGradient>
+    <radialGradient id="plateGlow" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(500 420) scale(430)">
+      <stop stop-color="#788CDC" stop-opacity="0.28"/>
+      <stop offset="1" stop-color="#788CDC" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="blade" x1="272" y1="728" x2="728" y2="272" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#89B4FA"/>
+      <stop offset="1" stop-color="#CBA6F7"/>
+    </linearGradient>
+    <!-- the cut: everything outside the blade band stays, the band is erased -->
+    <mask id="cut" maskUnits="userSpaceOnUse" x="0" y="0" width="1000" height="1000">
+      <rect width="1000" height="1000" fill="white"/>
+      <path d="M272 728L728 272" stroke="black" stroke-width="60" stroke-linecap="round"/>
+    </mask>
+    <filter id="bladeGlow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="14"/>
+    </filter>
+  </defs>
+
+  <rect width="1000" height="1000" rx="230" fill="url(#plate)"/>
+  <rect width="1000" height="1000" rx="230" fill="url(#plateGlow)"/>
+
+  <g mask="url(#cut)" fill="#F5F1E8">
+    <!-- film frame -->
+    <rect x="264" y="264" width="472" height="472" rx="78" fill="none" stroke="#F5F1E8" stroke-width="52"/>
+    <!-- sprocket holes: three top, three bottom -->
+    <rect x="347" y="352" width="52" height="52" rx="6"/>
+    <rect x="474" y="352" width="52" height="52" rx="6"/>
+    <rect x="601" y="352" width="52" height="52" rx="6"/>
+    <rect x="347" y="596" width="52" height="52" rx="6"/>
+    <rect x="474" y="596" width="52" height="52" rx="6"/>
+    <rect x="601" y="596" width="52" height="52" rx="6"/>
+  </g>
+
+  <!-- blade of light -->
+  <path d="M272 728L728 272" stroke="url(#blade)" stroke-width="38" stroke-linecap="round" opacity="0.30" filter="url(#bladeGlow)"/>
+  <path d="M272 728L728 272" stroke="url(#blade)" stroke-width="38" stroke-linecap="round"/>
+</svg>

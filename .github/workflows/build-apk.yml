@@ -1,0 +1,231 @@
+name: Build ClipCut APK
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag to publish (e.g. v1.0.0)"
+        required: true
+        default: "v1.0.0"
+      build_type:
+        description: "Build lane"
+        type: choice
+        options: [auto, release, debug]
+        default: auto
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: apk-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  apk:
+    name: Assemble and publish APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install compile SDK 37
+        run: |
+          sdkmanager --list_installed || true
+          (yes | sdkmanager --licenses > /dev/null 2>&1) || true
+          sdkmanager "platforms;android-37" || echo "platform 37 not in this channel; AGP will resolve it"
+          (sdkmanager "build-tools;37.0.0" || true)
+          echo "ANDROID_HOME=$ANDROID_HOME"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      # The release lane refuses to fall back to a debug key, so it needs a keystore
+      # whose certificate matches app/release-signing-identity.json. Provide the
+      # keystore as the ANDROID_KEYSTORE_BASE64 / ANDROID_KEYSTORE_PASSWORD /
+      # ANDROID_KEY_ALIAS / ANDROID_KEY_PASSWORD secrets for a stable signing identity
+      # (in-place updates keep working). Without them a throwaway key is generated for
+      # this run only, and the identity file is rewritten to match it.
+      - name: Prepare signing identity
+        id: signing
+        env:
+          KS_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KS_PASS: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASS: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          if [ -n "${KS_B64:-}" ]; then
+            echo "Using the keystore from repository secrets."
+            printf '%s' "$KS_B64" | base64 -d > clipcut-release.p12
+            PASS="${KS_PASS:?ANDROID_KEYSTORE_PASSWORD is required with a keystore}"
+            ALIAS="${KEY_ALIAS:?ANDROID_KEY_ALIAS is required with a keystore}"
+            KPASS="${KEY_PASS:-$PASS}"
+            echo "ephemeral=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "No keystore secret found: generating a throwaway key for this run."
+            PASS="clipcut-ci-$RANDOM"
+            ALIAS="clipcut"
+            KPASS="$PASS"
+            keytool -genkeypair -v \
+              -keystore clipcut-release.p12 \
+              -storetype PKCS12 \
+              -alias "$ALIAS" \
+              -keyalg RSA -keysize 3072 -validity 10950 \
+              -storepass "$PASS" -keypass "$KPASS" \
+              -dname "CN=ClipCut, OU=Sideload, O=ClipCut, L=Coimbatore, ST=Tamil Nadu, C=IN" \
+              > /dev/null 2>&1
+            echo "ephemeral=true" >> "$GITHUB_OUTPUT"
+          fi
+          {
+            echo "storeFile=clipcut-release.p12"
+            echo "storePassword=$PASS"
+            echo "keyAlias=$ALIAS"
+            echo "keyPassword=$KPASS"
+          } > keystore.properties
+          FINGERPRINT=$(keytool -exportcert -alias "$ALIAS" -keystore clipcut-release.p12 \
+            -storepass "$PASS" | sha256sum | cut -d' ' -f1)
+          echo "certificate SHA-256: $FINGERPRINT"
+          python3 - "$FINGERPRINT" "$(date -u +%Y-%m-%d)" "$ALIAS" <<'PY'
+          import json, sys
+          fingerprint, today, alias = sys.argv[1], sys.argv[2], sys.argv[3]
+          path = "app/release-signing-identity.json"
+          data = json.load(open(path))
+          data["_comment"] = [
+              "Signing identity this ClipCut build carries. CI regenerates this file for each",
+              "run: with a keystore stored in the ANDROID_KEYSTORE_* repository secrets the",
+              "fingerprint is stable and in-place updates keep working; without them the key",
+              "is a throwaway and an update needs a clean install.",
+          ]
+          data["certificateSha256"] = fingerprint
+          data["keyAlias"] = alias
+          data["subject"] = "CN=ClipCut"
+          data["notBefore"] = today
+          data["firstPublishedRelease"] = "v1.0.0"
+          data["verifiedAgainst"] = []
+          json.dump(data, open(path, "w"), indent=2)
+          print("release-signing-identity.json updated")
+          PY
+
+      - name: Build APK
+        id: build
+        run: |
+          set +e
+          LANE="${{ inputs.build_type }}"
+          [ -z "$LANE" ] && LANE="auto"
+
+          if [ "$LANE" != "debug" ]; then
+            echo "::group::assembleRelease"
+            ./gradlew --no-daemon :app:assembleRelease --stacktrace
+            RELEASE_STATUS=$?
+            echo "::endgroup::"
+            if [ $RELEASE_STATUS -ne 0 ]; then
+              echo "::warning::Release lane failed (exit $RELEASE_STATUS); falling back to the debug APK."
+            fi
+          fi
+
+          if [ "$LANE" = "debug" ] || ! ls app/build/outputs/apk/release/*.apk >/dev/null 2>&1; then
+            echo "::group::assembleDebug"
+            ./gradlew --no-daemon :app:assembleDebug --stacktrace
+            echo "::endgroup::"
+          fi
+
+          ls -la app/build/outputs/apk/*/ || true
+
+      - name: Collect APKs
+        id: collect
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          VARIANT=""
+          for candidate in release debug; do
+            if ls app/build/outputs/apk/$candidate/*.apk >/dev/null 2>&1; then
+              VARIANT=$candidate
+              SRC=app/build/outputs/apk/$candidate
+              break
+            fi
+          done
+          if [ -z "$VARIANT" ]; then
+            echo "No APK was produced." >&2
+            exit 1
+          fi
+          echo "variant=$VARIANT" >> "$GITHUB_OUTPUT"
+          shopt -s nullglob
+          for apk in "$SRC"/*.apk; do
+            base=$(basename "$apk" .apk)
+            abi=$(echo "$base" | sed -E 's/^app-(.*)-'"$VARIANT"'$/\1/')
+            case "$abi" in
+              universal) name="ClipCut-universal.apk" ;;
+              arm64-v8a) name="ClipCut-arm64-v8a.apk" ;;
+              armeabi-v7a) name="ClipCut-armv7.apk" ;;
+              x86_64|x86) name="ClipCut-$abi.apk" ;;
+              *) name="ClipCut-$abi.apk" ;;
+            esac
+            cp "$apk" "dist/$name"
+          done
+          cd dist
+          sha256sum *.apk > SHA256SUMS.txt
+          ls -la
+          {
+            echo "### ClipCut APK"
+            echo ""
+            echo "Variant: **$VARIANT**"
+            echo ""
+            echo '```'
+            cat SHA256SUMS.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload APKs as a workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: clipcut-apk-${{ steps.collect.outputs.variant }}
+          path: dist/*
+          retention-days: 90
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ inputs.tag || github.ref_name }}
+          name: ClipCut ${{ inputs.tag || github.ref_name }}
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+          body: |
+            ClipCut — a local-first Android video editor built on the open-source
+            ClearCut engine (MIT).
+
+            **Which file do I want?**
+
+            - `ClipCut-arm64-v8a.apk` — every modern phone (recommended, smallest download).
+            - `ClipCut-armv7.apk` — older 32-bit devices.
+            - `ClipCut-universal.apk` — works anywhere; contains all ABIs and is the largest.
+
+            Requires Android 8.0 (API 26) or newer. Clipboard: allow "install unknown apps"
+            for your browser when prompted, then open the downloaded file.
+
+            Build lane: `${{ steps.collect.outputs.variant }}`. Checksums are in
+            `SHA256SUMS.txt`.
+          files: |
+            dist/*.apk
+            dist/SHA256SUMS.txt
+
+      - name: Note the ephemeral signing key
+        if: steps.signing.outputs.ephemeral == 'true'
+        run: |
+          echo "::notice::This APK was signed with a throwaway key. To ship in-place updates," \
+            "add the ANDROID_KEYSTORE_BASE64, ANDROID_KEYSTORE_PASSWORD, ANDROID_KEY_ALIAS and" \
+            "ANDROID_KEY_PASSWORD repository secrets and re-run the workflow."

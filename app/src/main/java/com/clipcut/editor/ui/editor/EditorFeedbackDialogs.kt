@@ -1,0 +1,388 @@
+@file:OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+
+package com.clipcut.editor.ui.editor
+
+import com.clipcut.editor.ui.theme.ClipCutAccents
+import com.clipcut.editor.ui.theme.LocalClipCutColors
+
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Error
+import androidx.compose.material.icons.filled.IosShare
+import androidx.compose.material.icons.filled.ReportProblem
+import androidx.compose.material.icons.filled.TaskAlt
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import com.clipcut.editor.R
+import com.clipcut.editor.engine.TimelineExchangeValidator
+import com.clipcut.editor.ui.theme.ClipCutDialogIcon
+import com.clipcut.editor.ui.theme.ClipCutPrimaryButton
+import com.clipcut.editor.ui.theme.Radius
+import com.clipcut.editor.ui.theme.Spacing
+
+@Composable
+internal fun AiRequirementInfoChip(
+    label: String,
+    value: String,
+    accent: Color,
+    modifier: Modifier = Modifier
+) {
+    val semanticColors = LocalClipCutColors.current
+    Surface(
+        modifier = modifier,
+        color = accent.copy(alpha = 0.1f),
+        border = BorderStroke(1.dp, accent.copy(alpha = 0.24f)),
+        shape = RoundedCornerShape(Radius.lg)
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(2.dp)
+        ) {
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelSmall,
+                color = semanticColors.subtext
+            )
+            Text(
+                text = value,
+                style = MaterialTheme.typography.labelLarge,
+                color = accent,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+    }
+}
+
+@Composable
+internal fun BackupImportReportDialog(
+    feedback: BackupImportFeedback,
+    onDismiss: () -> Unit
+) {
+    val semanticColors = LocalClipCutColors.current
+    val accent = if (feedback.succeeded) ClipCutAccents.Green else ClipCutAccents.Red
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        icon = {
+            ClipCutDialogIcon(
+                icon = if (feedback.succeeded) Icons.Default.TaskAlt else Icons.Default.Error,
+                accent = accent
+            )
+        },
+        title = {
+            Text(
+                text = feedback.title,
+                color = semanticColors.text,
+                style = MaterialTheme.typography.titleLarge
+            )
+        },
+        text = {
+            BackupImportReportBody(feedback = feedback, accent = accent)
+        },
+        confirmButton = {
+            ClipCutPrimaryButton(
+                text = stringResource(R.string.done),
+                onClick = onDismiss,
+                icon = Icons.Default.Check
+            )
+        },
+        containerColor = semanticColors.panelHighest,
+        titleContentColor = semanticColors.text,
+        textContentColor = semanticColors.subtext,
+        shape = RoundedCornerShape(Radius.xxl)
+    )
+}
+
+@Composable
+private fun BackupImportReportBody(
+    feedback: BackupImportFeedback,
+    accent: Color
+) {
+    val semanticColors = LocalClipCutColors.current
+    val report = feedback.report
+    Column(
+        modifier = Modifier
+            .heightIn(max = 420.dp)
+            .verticalScroll(rememberScrollState()),
+        verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(Spacing.md)
+    ) {
+        Text(
+            text = feedback.body,
+            color = semanticColors.subtext,
+            style = MaterialTheme.typography.bodyMedium
+        )
+        feedback.errorMessage?.let {
+            ReportCallout(
+                title = "Reason",
+                body = it,
+                accent = ClipCutAccents.Red
+            )
+        }
+        FlowRow(
+            horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(Spacing.sm),
+            verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(Spacing.sm)
+        ) {
+            ReportMetric("Schema", "v${report.schemaVersion}", accent)
+            ReportMetric("Media", "${report.mediaResolved}/${report.mediaTotal}", if (report.mediaMissing > 0) ClipCutAccents.Peach else ClipCutAccents.Green)
+            ReportMetric("Warnings", report.warnings.size.toString(), if (report.warnings.isEmpty()) ClipCutAccents.Green else ClipCutAccents.Yellow)
+            ReportMetric("Project ID", if (report.projectIdCollided) "Regenerated" else "Clean", if (report.projectIdCollided) ClipCutAccents.Sapphire else ClipCutAccents.Green)
+        }
+        if (report.mediaMissing > 0) {
+            ReportCallout(
+                title = "Missing media",
+                body = "${report.mediaMissing} linked file(s) were not bundled or could not be restored. Relink them before export.",
+                accent = ClipCutAccents.Peach
+            )
+            report.unresolvedMediaUris.take(4).forEach { uri ->
+                ReportIssueRow(
+                    severity = "Media",
+                    path = uri,
+                    message = "Still points to the original location.",
+                    suggestedFix = "Open Media Manager and relink this asset.",
+                    accent = ClipCutAccents.Peach
+                )
+            }
+            if (report.unresolvedMediaUris.size > 4) {
+                Text(
+                    text = "+${report.unresolvedMediaUris.size - 4} more missing media reference(s)",
+                    color = semanticColors.subtext,
+                    style = MaterialTheme.typography.bodySmall
+                )
+            }
+        }
+        report.warnings.forEach { warning ->
+            ReportIssueRow(
+                severity = "Warning",
+                path = "Archive",
+                message = warning,
+                suggestedFix = null,
+                accent = ClipCutAccents.Yellow
+            )
+        }
+    }
+}
+
+@Composable
+internal fun TimelineExchangeReportDialog(
+    feedback: TimelineExchangeFeedback,
+    onDismiss: () -> Unit
+) {
+    val semanticColors = LocalClipCutColors.current
+    val accent = when {
+        !feedback.succeeded -> ClipCutAccents.Red
+        feedback.report.warnings.isNotEmpty() -> ClipCutAccents.Yellow
+        else -> ClipCutAccents.Green
+    }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        icon = {
+            ClipCutDialogIcon(
+                icon = if (feedback.succeeded) Icons.Default.IosShare else Icons.Default.ReportProblem,
+                accent = accent
+            )
+        },
+        title = {
+            Text(
+                text = feedback.title,
+                color = semanticColors.text,
+                style = MaterialTheme.typography.titleLarge
+            )
+        },
+        text = {
+            TimelineExchangeReportBody(feedback = feedback, accent = accent)
+        },
+        confirmButton = {
+            ClipCutPrimaryButton(
+                text = stringResource(R.string.done),
+                onClick = onDismiss,
+                icon = Icons.Default.Check
+            )
+        },
+        containerColor = semanticColors.panelHighest,
+        titleContentColor = semanticColors.text,
+        textContentColor = semanticColors.subtext,
+        shape = RoundedCornerShape(Radius.xxl)
+    )
+}
+
+@Composable
+private fun TimelineExchangeReportBody(
+    feedback: TimelineExchangeFeedback,
+    accent: Color
+) {
+    val semanticColors = LocalClipCutColors.current
+    val report = feedback.report
+    Column(
+        modifier = Modifier
+            .heightIn(max = 420.dp)
+            .verticalScroll(rememberScrollState()),
+        verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(Spacing.md)
+    ) {
+        Text(
+            text = feedback.body,
+            color = semanticColors.subtext,
+            style = MaterialTheme.typography.bodyMedium
+        )
+        feedback.outputFileName?.let {
+            ReportCallout(
+                title = "Saved file",
+                body = it,
+                accent = ClipCutAccents.Green
+            )
+        }
+        FlowRow(
+            horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(Spacing.sm),
+            verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(Spacing.sm)
+        ) {
+            ReportMetric("Format", report.format.displayName, accent)
+            ReportMetric("Blocking", report.errors.size.toString(), if (report.errors.isEmpty()) ClipCutAccents.Green else ClipCutAccents.Red)
+            ReportMetric("Lossy", report.warnings.size.toString(), if (report.warnings.isEmpty()) ClipCutAccents.Green else ClipCutAccents.Yellow)
+            ReportMetric("Notes", report.infos.size.toString(), ClipCutAccents.Sapphire)
+        }
+        report.issues.take(8).forEach { issue ->
+            val issueAccent = when (issue.severity) {
+                TimelineExchangeValidator.Severity.ERROR -> ClipCutAccents.Red
+                TimelineExchangeValidator.Severity.WARNING -> ClipCutAccents.Yellow
+                TimelineExchangeValidator.Severity.INFO -> ClipCutAccents.Sapphire
+            }
+            ReportIssueRow(
+                severity = issue.severity.name.lowercase().replaceFirstChar { it.uppercase() },
+                path = issue.path,
+                message = issue.message,
+                suggestedFix = issue.suggestedFix,
+                accent = issueAccent
+            )
+        }
+        if (report.issues.size > 8) {
+            Text(
+                text = "+${report.issues.size - 8} more issue(s)",
+                color = semanticColors.subtext,
+                style = MaterialTheme.typography.bodySmall
+            )
+        }
+    }
+}
+
+@Composable
+private fun ReportMetric(
+    label: String,
+    value: String,
+    accent: Color
+) {
+    val semanticColors = LocalClipCutColors.current
+    Surface(
+        color = accent.copy(alpha = 0.11f),
+        shape = RoundedCornerShape(Radius.sm),
+        border = BorderStroke(1.dp, accent.copy(alpha = 0.24f))
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+            verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(2.dp)
+        ) {
+            Text(
+                text = label,
+                color = semanticColors.subtext,
+                style = MaterialTheme.typography.labelSmall,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            Text(
+                text = value,
+                color = accent,
+                style = MaterialTheme.typography.labelLarge,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+    }
+}
+
+@Composable
+private fun ReportCallout(
+    title: String,
+    body: String,
+    accent: Color
+) {
+    val semanticColors = LocalClipCutColors.current
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = accent.copy(alpha = 0.09f),
+        shape = RoundedCornerShape(Radius.lg),
+        border = BorderStroke(1.dp, accent.copy(alpha = 0.22f))
+    ) {
+        Column(
+            modifier = Modifier.padding(Spacing.md),
+            verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(Spacing.xs)
+        ) {
+            Text(
+                text = title,
+                color = accent,
+                style = MaterialTheme.typography.labelLarge
+            )
+            Text(
+                text = body,
+                color = semanticColors.subtext,
+                style = MaterialTheme.typography.bodySmall
+            )
+        }
+    }
+}
+
+@Composable
+private fun ReportIssueRow(
+    severity: String,
+    path: String,
+    message: String,
+    suggestedFix: String?,
+    accent: Color
+) {
+    val semanticColors = LocalClipCutColors.current
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = semanticColors.panel.copy(alpha = 0.74f),
+        shape = RoundedCornerShape(Radius.lg),
+        border = BorderStroke(1.dp, accent.copy(alpha = 0.2f))
+    ) {
+        Column(
+            modifier = Modifier.padding(Spacing.md),
+            verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(Spacing.xs)
+        ) {
+            Text(
+                text = "$severity · $path",
+                color = accent,
+                style = MaterialTheme.typography.labelMedium,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
+            )
+            Text(
+                text = message,
+                color = semanticColors.text,
+                style = MaterialTheme.typography.bodySmall
+            )
+            if (!suggestedFix.isNullOrBlank()) {
+                Text(
+                    text = suggestedFix,
+                    color = semanticColors.subtext,
+                    style = MaterialTheme.typography.bodySmall
+                )
+            }
+        }
+    }
+}

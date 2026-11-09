@@ -1,0 +1,66 @@
+{
+  "OTIO_SCHEMA": "Timeline.1",
+  "name": "OTIO 0.15 fixture",
+  "metadata": {
+    "clipcut_otio_schema_version": "0.15",
+    "clipcut_otio_adapter_range": "0.15-0.16",
+    "clipcut_timebase_numerator": 24,
+    "clipcut_timebase_denominator": 1
+  },
+  "tracks": {
+    "OTIO_SCHEMA": "Stack.1",
+    "name": "tracks",
+    "children": [
+      {
+        "OTIO_SCHEMA": "Track.1",
+        "name": "Picture",
+        "kind": "Video",
+        "metadata": {
+          "clipcut_track_id": "fixture-video",
+          "clipcut_track_type": "VIDEO"
+        },
+        "children": [
+          {
+            "OTIO_SCHEMA": "Clip.1",
+            "name": "Opening shot",
+            "effects": [],
+            "markers": [],
+            "source_range": {
+              "OTIO_SCHEMA": "TimeRange.1",
+              "start_time": {
+                "OTIO_SCHEMA": "RationalTime.1",
+                "value": 0,
+                "rate": 24
+              },
+              "duration": {
+                "OTIO_SCHEMA": "RationalTime.1",
+                "value": 48,
+                "rate": 24
+              }
+            },
+            "media_reference": {
+              "OTIO_SCHEMA": "ExternalReference.1",
+              "target_url": "file:///media/opening.mp4",
+              "available_range": {
+                "OTIO_SCHEMA": "TimeRange.1",
+                "start_time": {
+                  "OTIO_SCHEMA": "RationalTime.1",
+                  "value": 0,
+                  "rate": 24
+                },
+                "duration": {
+                  "OTIO_SCHEMA": "RationalTime.1",
+                  "value": 48,
+                  "rate": 24
+                }
+              }
+            },
+            "metadata": {
+              "clipcut_clip_id": "otio-015-clip"
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

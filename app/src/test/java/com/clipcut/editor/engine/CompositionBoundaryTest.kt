@@ -1,0 +1,126 @@
+package com.clipcut.editor.engine
+
+import android.net.FakeUri
+import androidx.media3.common.C
+import androidx.media3.transformer.Composition
+import androidx.media3.transformer.EditedMediaItemSequence
+import com.clipcut.editor.model.Clip
+import com.clipcut.editor.model.Track
+import com.clipcut.editor.model.TrackType
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
+import org.junit.Test
+
+class CompositionBoundaryTest {
+
+    @Test
+    fun compositionPlanOwnsLayerOrderingSoloFilteringAndOverlayDuration() {
+        val base = track("base", TrackType.VIDEO, 0, 1_000L)
+        val overlay = track("overlay", TrackType.OVERLAY, 3, 2_000L)
+        val hidden = track("hidden", TrackType.VIDEO, 4, 5_000L, visible = false)
+        val music = track("music", TrackType.AUDIO, 2, 1_500L, solo = true)
+        val plan = CompositionPlanBuilder.build(
+            tracks = listOf(music, hidden, base, overlay),
+            additionalDurationsMs = listOf(7_500L),
+        )
+
+        assertEquals(listOf("overlay", "base"), plan.visualTracks.map { it.id })
+        assertEquals(listOf("music"), plan.audioTracks.map { it.id })
+        assertEquals(setOf("music"), plan.soloTrackIds)
+        assertEquals(7_500L, plan.durationMs)
+    }
+
+    @Test
+    fun compositionBuilderKeepsSequenceCountAndRejectsTransmuxWhenAudioIsExplicit() {
+        val sequence = EditedMediaItemSequence.Builder(setOf(C.TRACK_TYPE_VIDEO))
+            .addGap(1_000L)
+            .build()
+        val composition = CompositionBuilder.build(
+            CompositionBuildRequest(
+                sequences = listOf(sequence),
+                hasAudioTracks = true,
+                hasEmbeddedVisualAudio = true,
+                targetWidth = 1280,
+                targetHeight = 720,
+                allowAudioTransmux = true,
+            )
+        )
+
+        assertEquals(1, composition.sequences.size)
+        assertFalse(composition.transmuxAudio)
+        assertTrue(composition.sequences.single() === sequence)
+    }
+
+    @Test
+    fun colorPlanModeReachesMedia3() {
+        val expected = mapOf(
+            ColorHdrMode.KEEP_HDR to Composition.HDR_MODE_KEEP_HDR,
+            ColorHdrMode.TONE_MAP_TO_SDR to Composition.HDR_MODE_TONE_MAP_HDR_TO_SDR_USING_OPEN_GL,
+            ColorHdrMode.TONE_MAP_IN_DECODER to Composition.HDR_MODE_TONE_MAP_HDR_TO_SDR_USING_MEDIACODEC,
+            ColorHdrMode.INTERPRET_HDR_AS_SDR to Composition.HDR_MODE_EXPERIMENTAL_FORCE_INTERPRET_HDR_AS_SDR,
+        )
+        assertEquals(ColorHdrMode.entries.toSet(), expected.keys)
+        for ((mode, media3Mode) in expected) {
+            val sequence = EditedMediaItemSequence.Builder(setOf(C.TRACK_TYPE_VIDEO)).addGap(1_000L).build()
+            val composition = CompositionBuilder.build(
+                CompositionBuildRequest(
+                    sequences = listOf(sequence),
+                    hasAudioTracks = false,
+                    hasEmbeddedVisualAudio = false,
+                    targetWidth = 1280,
+                    targetHeight = 720,
+                    hdrMode = mode,
+                )
+            )
+            assertEquals(mode.name, media3Mode, composition.hdrMode)
+        }
+    }
+
+    @Test
+    fun compositionPlanIncludesPerTrackOffsetInTimelineDuration() {
+        val shiftedAudio = track("audio", TrackType.AUDIO, 0, 1_000L)
+            .copy(timelineOffsetMs = 500L)
+
+        val plan = CompositionPlanBuilder.build(listOf(shiftedAudio))
+
+        assertEquals(1_500L, plan.durationMs)
+    }
+
+    @Test
+    fun compositionPlanIncludesPerClipAudioSyncOffsetInTimelineDuration() {
+        val baseAudio = track("audio", TrackType.AUDIO, 0, 1_000L)
+        val shiftedAudio = baseAudio.copy(clips = baseAudio.clips.map {
+                it.copy(audioSyncOffsetMs = 500L)
+            })
+
+        val plan = CompositionPlanBuilder.build(listOf(shiftedAudio))
+
+        assertEquals(1_500L, plan.durationMs)
+        assertEquals(500L, shiftedAudio.clips.single().audioSyncOffsetMs)
+    }
+
+    private fun track(
+        id: String,
+        type: TrackType,
+        index: Int,
+        durationMs: Long,
+        visible: Boolean = true,
+        solo: Boolean = false,
+    ) = Track(
+        id = id,
+        type = type,
+        index = index,
+        isVisible = visible,
+        isSolo = solo,
+        clips = listOf(
+            Clip(
+                id = "$id-clip",
+                sourceUri = FakeUri,
+                sourceDurationMs = durationMs,
+                timelineStartMs = 0L,
+                trimEndMs = durationMs,
+            )
+        ),
+    )
+}

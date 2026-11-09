@@ -1,0 +1,176 @@
+package com.clipcut.editor.ui.mediapicker
+
+import android.content.Context
+import android.net.Uri
+import androidx.test.core.app.ApplicationProvider
+import com.clipcut.editor.engine.managedMediaDir
+import com.clipcut.editor.engine.writeManagedMediaAssetSidecar
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
+import kotlin.coroutines.EmptyCoroutineContext
+import org.junit.After
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
+import org.junit.Before
+import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.shadows.ShadowStatFs
+import java.io.File
+
+@RunWith(RobolectricTestRunner::class)
+class MediaPickerBatchImportTest {
+
+    private val context: Context = ApplicationProvider.getApplicationContext()
+
+    @Before
+    fun giveTheAppRoomToCopy() {
+        ShadowStatFs.reset()
+        ShadowStatFs.registerStats(context.filesDir, 1_000_000, 1_000_000, 1_000_000)
+        managedMediaDir(context).deleteRecursively()
+    }
+
+    @After
+    fun cleanUp() {
+        managedMediaDir(context).deleteRecursively()
+        ShadowStatFs.reset()
+    }
+
+    @Test
+    fun aFinishedBatchKeepsEveryCopy() = runBlocking {
+        var adopted: MediaPickerBatchImportResult? = null
+        val progress = mutableListOf<Int>()
+        val result = importMediaPickerBatch(
+            context = context,
+            selections = freshSources(3),
+            onProgress = { progress += it },
+            adoptContext = EmptyCoroutineContext,
+        ) { adopted = it }
+
+        assertEquals(listOf(0, 1, 1, 2, 2, 3), progress)
+        assertEquals(result, adopted)
+        assertEquals(3, result.imported.size)
+        assertTrue(result.imported.all { File(checkNotNull(it.uri.path)).isFile })
+        assertEquals(3, managedMediaFiles().size)
+    }
+
+    @Test
+    fun cancellingAtAnyItemBoundaryLeavesOnlyWhatWasThereBefore() {
+        val alreadyManaged = existingManagedFile()
+        val before = managedTree()
+        // Three items report progress six times: before and after each one.
+        for (boundary in 1..6) {
+            val selections = listOf(
+                freshSource("a$boundary"),
+                selection(Uri.fromFile(alreadyManaged), "kept$boundary"),
+                freshSource("b$boundary"),
+            )
+
+            val (failure, adopted) = runAbortingAt(selections, boundary) { job -> job.cancel() }
+
+            assertTrue("boundary $boundary: $failure", failure is CancellationException)
+            assertEquals("boundary $boundary", false, adopted)
+            assertEquals("boundary $boundary", before, managedTree())
+            assertTrue(alreadyManaged.isFile)
+        }
+    }
+
+    @Test
+    fun aBatchThatFailsPartWayDeletesTheCopiesItMade() {
+        val before = managedTree()
+
+        val (failure, adopted) = runAbortingAt(freshSources(3), boundary = 4) { error("disk went away") }
+
+        assertTrue("$failure", failure is IllegalStateException)
+        assertEquals(false, adopted)
+        assertEquals(before, managedTree())
+    }
+
+    @Test
+    fun aCancelThatLandsJustAfterAdoptionKeepsTheCopies() {
+        // The picker releases its read grants after the batch returns; a cancel that lands
+        // then must not strand or delete copies the editor already took.
+        var adopted = emptyList<Uri>()
+        val failure = runBlocking {
+            var thrown: Throwable? = null
+            lateinit var job: Job
+            job = launch(Dispatchers.IO, start = CoroutineStart.LAZY) {
+                try {
+                    importMediaPickerBatch(context, freshSources(3), adoptContext = EmptyCoroutineContext) { result ->
+                        adopted = result.imported.map { it.uri }
+                        job.cancel()
+                    }
+                } catch (error: Throwable) {
+                    thrown = error
+                }
+            }
+            job.start()
+            job.join()
+            thrown
+        }
+
+        assertTrue("$failure", failure is CancellationException)
+        assertEquals(3, adopted.size)
+        assertTrue(adopted.all { File(checkNotNull(it.path)).isFile })
+        assertEquals(3, managedMediaFiles().size)
+    }
+
+    private fun runAbortingAt(
+        selections: List<MediaPickerSelection>,
+        boundary: Int,
+        abort: (Job) -> Unit,
+    ): Pair<Throwable?, Boolean> = runBlocking {
+        var calls = 0
+        var failure: Throwable? = null
+        var adopted = false
+        lateinit var job: Job
+        job = launch(Dispatchers.IO, start = CoroutineStart.LAZY) {
+            try {
+                importMediaPickerBatch(
+                    context = context,
+                    selections = selections,
+                    onProgress = { if (++calls == boundary) abort(job) },
+                    adoptContext = EmptyCoroutineContext,
+                ) { adopted = true }
+            } catch (thrown: Throwable) {
+                failure = thrown
+            }
+        }
+        job.start()
+        job.join()
+        failure to adopted
+    }
+
+    private fun managedMediaFiles(): List<File> =
+        managedMediaDir(context).listFiles()?.filter { !it.name.endsWith(".asset.json") }.orEmpty()
+
+    private fun managedTree(): Set<String> =
+        managedMediaDir(context).walkTopDown().filter { it.isFile }.map { it.name }.toSet()
+
+    /** A file an earlier import already copied in, sidecar and all. */
+    private fun existingManagedFile(): File {
+        val file = File(managedMediaDir(context).apply { mkdirs() }, "already-here.mp4")
+        file.writeBytes(ByteArray(2_048) { 7 })
+        writeManagedMediaAssetSidecar(context, Uri.fromFile(file), Uri.parse("content://picker/already-here"), "video")
+        return file
+    }
+
+    private fun freshSources(count: Int): List<MediaPickerSelection> = (1..count).map { freshSource("clip$it") }
+
+    private fun freshSource(name: String): MediaPickerSelection {
+        val file = File(context.cacheDir, "$name-${System.nanoTime()}.mp4").apply { writeBytes(ByteArray(4_096) { 1 }) }
+        return selection(Uri.fromFile(file), name)
+    }
+
+    private fun selection(uri: Uri, name: String) = MediaPickerSelection(
+        id = name,
+        uri = uri,
+        mediaType = "video",
+        displayName = name,
+        captureTimeMs = null,
+    )
+}
