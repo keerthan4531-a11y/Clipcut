@@ -1,5 +1,13 @@
 ClipCut third-party notices
 
+Upstream project
+
+ClipCut is a rebrand of ClearCut (https://github.com/SysAdminDoc/ClearCut), an open-source
+Android video editor released under the MIT licence. Copyright (c) 2026 SysAdminDoc. The
+editing engine, AI pipelines, exporters and asset formats in this repository originate
+there; ClipCut's own changes are the product name, application id, iconography, theme
+naming and documentation.
+
 FFmpegKitNext / FFmpeg
 
 ClipCut bundles a source-pinned LGPL-3.0-or-later build of FFmpegKitNext 8.1.0 with FFmpeg 8.1.2, OpenH264, libass, and the supporting libraries recorded in third_party/ffmpeg-kit-next/native-lock.json. The exact upstream commit is 3e223118e6e8fb6208693ecf3952e77cd096f587 and the reproducible build command is ./nix-android.sh -p android-r27d --enable-libass --enable-libjxl --enable-android-media-codec --enable-android-zlib --enable-openh264 --jobs=8. The ClipCut security patch disables the VobSub, TDSC, MACE6, ADX/AAX, PNG/APNG, RASC, IAMF, and LCL/ZLIB components named in the lockfile's required advisory inventory.
