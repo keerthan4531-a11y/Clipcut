@@ -157,7 +157,7 @@ jobs:
         run: |
           set +e
           echo "::warning::Native advisory review horizon expired 2026-10-31; shipping pinned bytes with the debt recorded (CLIPCUT_ALLOW_EXPIRED_NATIVE_REVIEW=1)."
-          echo "::warning::Dependency verification runs lenient: gradle/verification-metadata.xml is missing five transitive buildscript artifacts, though scripts/dependency_freshness_snapshot.json declares strict.
+          echo "::warning::Dependency verification runs lenient: gradle/verification-metadata.xml is missing five transitive buildscript artifacts, though scripts/dependency_freshness_snapshot.json declares strict."
           LANE="${{ inputs.build_type }}"
           [ -z "$LANE" ] && LANE="auto"
 
