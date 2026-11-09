@@ -56,11 +56,18 @@ jobs:
           echo "ANDROID_HOME: ${ANDROID_HOME:-unset}"
           test -x "$SDKMANAGER"
           yes | "$SDKMANAGER" --licenses > /dev/null 2>&1 || true
-          "$SDKMANAGER" --list 2>/dev/null | grep -E "platforms;android-3[4-9]" | head -20 || true
-          "$SDKMANAGER" "platforms;android-37" || echo "::warning::platform 37 install failed; Gradle will try to resolve it"
-          "$SDKMANAGER" "build-tools;37.0.0" || echo "::warning::build-tools 37.0.0 install failed"
+          "$SDKMANAGER" --list 2>/dev/null | grep -E "platforms;android-3[6-9]" | head -20 || true
+          # SDK platforms carry minor versions in this channel (android-37.0, 37.1, ...).
+          # AGP resolves compileSdk 37 to the newest installed 37.x platform, and the
+          # runner image already ships those, so a failed install is not fatal here.
+          for pkg in "platforms;android-37" "platforms;android-37.0" "build-tools;37.0.0"; do
+            "$SDKMANAGER" "$pkg" || echo "::warning::could not install $pkg (continuing)"
+          done
           echo "--- installed platforms ---"
           ls -1 "${ANDROID_HOME:-/usr/local/lib/android/sdk}/platforms" || true
+
+      - name: Make the Gradle wrapper executable
+        run: chmod +x gradlew
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
