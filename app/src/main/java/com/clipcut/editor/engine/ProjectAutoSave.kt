@@ -1713,6 +1713,7 @@ data class AutoSaveState(
             return JSONObject().apply {
                 put("type", t.type.name)
                 put("durationMs", t.durationMs)
+                t.glTransitionId?.takeIf { it.isNotBlank() }?.let { put("glTransitionId", it) }
                 put("easing", t.easing.name)
             }
         }
@@ -2318,7 +2319,13 @@ data class AutoSaveState(
             return Transition(
                 type = safeValueOf(json.optString("type", "DISSOLVE"), TransitionType.DISSOLVE),
                 durationMs = json.optLong("durationMs", 500L).coerceIn(100L, 2000L),
-                easing = safeValueOf(json.optString("easing", "LINEAR"), TransitionEasing.LINEAR)
+                easing = safeValueOf(json.optString("easing", "LINEAR"), TransitionEasing.LINEAR),
+                // Restricted to the charset used by the bundled catalogue: the id is turned
+                // into an asset path, so anything exotic is dropped rather than trusted.
+                glTransitionId = json.optString("glTransitionId").takeIf { id ->
+                    id.isNotBlank() && id.length <= 64 &&
+                        id.all { it.isLetterOrDigit() || it == '_' || it == '-' }
+                }
             )
         }
 

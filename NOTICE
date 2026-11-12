@@ -17,3 +17,79 @@ The Android package includes the upstream license resources under res/raw/licens
 DeepFilterNet
 
 ClipCut may bundle io.github.kaleyravideo:android-deepfilternet:0.0.8 for on-device audio noise reduction. The Kaleyra Android AAR is licensed under Apache License 2.0 and is built on the upstream DeepFilterNet project, whose code and model weights are available under MIT or Apache License 2.0 at the user's option. Keep the relevant Apache/MIT notices with redistributed builds that include the DeepFilterNet native library and bundled model.
+
+gl-transitions
+
+ClipCut bundles transition shaders derived from gl-transitions
+(https://github.com/gl-transitions/gl-transitions), licensed under the MIT licence,
+Copyright (c) 2017-present gl-transitions contributors. There are 212 of them, and each
+shader remains under the licence of the individual author named in its upstream header
+(overwhelmingly MIT, a few CC-BY-3.0); the per-transition author and licence strings are
+preserved verbatim in app/src/main/assets/gltransitions/catalog.json, which ships with the
+APK. The shaders were mechanically converted from GLSL ES 1.00 to GLSL ES 3.00 by
+tools/gen_gltransitions.py and are rendered by
+app/src/main/java/com/clipcut/editor/engine/gltransition/GlTransitionEffect.kt. Two
+upstream transitions (DisplacementMap, LumaWipe) are not bundled because they require an
+extra user-supplied texture.
+
+This is a list of every author whose shader is bundled:
+  - 0gust1 (1 shader)
+  - @Flexi23 (1 shader)
+  - Adrian Purser (1 shader)
+  - Anastasia Dunbar (1 shader)
+  - Ben Lucas (3 shaders)
+  - Ben Zhang (1 shader)
+  - Boundless (1 shader)
+  - Boundless <info@boundless-beta.com> (1 shader)
+  - Brandon Anzaldi (1 shader)
+  - Eke Péter <peterekepeter@gmail.com> (1 shader)
+  - Fabien Benetou (1 shader)
+  - Fernando Kuteken (6 shaders)
+  - Gaëtan Renaudeau (1 shader)
+  - Gunnar Roth (1 shader)
+  - Handk (2 shaders)
+  - Hewlett-Packard (1 shader)
+  - Ian McEwan, Ashima Arts. (1 shader)
+  - KMojek (1 shader)
+  - Mark Craig (3 shaders)
+  - Matt DesLauriers (1 shader)
+  - Max Plotnikov (1 shader)
+  - Mr Speaker (1 shader)
+  - OllyOllyOlly (7 shaders)
+  - P-Seebauer (1 shader)
+  - Paweł Płóciennik (1 shader)
+  - Rich Harris (1 shader)
+  - Sergey Kosarevsky (2 shaders)
+  - Ted Schundler (1 shader)
+  - Thibaut Foussard (1 shader)
+  - Tianshuo (1 shader)
+  - TimDonselaar (1 shader)
+  - Woohyun Kim (1 shader)
+  - Xaychru (2 shaders)
+  - Yoni Maltsman @friendlyspinach (2 shaders)
+  - Zeh Fernando (2 shaders)
+  - bobylito (1 shader)
+  - bread (3 shaders)
+  - chenkai (1 shader)
+  - dycm8009 (1 shader)
+  - gre (120 shaders)
+  - haiyoucuv (1 shader)
+  - hjm1fb (1 shader)
+  - hong (1 shader)
+  - huynx (1 shader)
+  - lbl (1 shader)
+  - liubailin2020@gmail.com (1 shader)
+  - lizhongjian (1 shader)
+  - lql (1 shader)
+  - mandubian (2 shaders)
+  - martiniti (6 shaders)
+  - mernking (gitlab.com/Godswork) (1 shader)
+  - mikolalysenko (1 shader)
+  - numb3r23 (1 shader)
+  - nwoeanhinnogaehr (4 shaders)
+  - paniq (1 shader)
+  - pschroen (1 shader)
+  - pthrasher (2 shaders)
+  - rectalogic (1 shader)
+  - towrabbit (1 shader)
+  - zhmy (2 shaders)

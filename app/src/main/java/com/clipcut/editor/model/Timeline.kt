@@ -7,7 +7,15 @@ import java.util.UUID
 data class Transition(
     val type: TransitionType,
     val durationMs: Long = 500L,
-    val easing: TransitionEasing = TransitionEasing.LINEAR
+    val easing: TransitionEasing = TransitionEasing.LINEAR,
+    /**
+     * Id of a bundled gl-transitions shader (see `assets/gltransitions/catalog.json`).
+     *
+     * When set, the renderer uses the two-source GLSL shader instead of [type]; [type] is
+     * kept purely as a serialisation/fallback hint so old projects and older builds keep
+     * rendering something sensible.
+     */
+    val glTransitionId: String? = null
 ) {
     init {
         require(durationMs > 0) { "Transition duration must be positive" }

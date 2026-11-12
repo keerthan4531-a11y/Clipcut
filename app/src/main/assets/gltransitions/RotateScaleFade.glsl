@@ -1,0 +1,52 @@
+#version 300 es
+// RotateScaleFade — from gl-transitions (MIT), author: Fernando Kuteken
+// Converted to GLSL ES 3.00 for ClipCut's two-texture transition program.
+precision highp float;
+precision highp sampler2D;
+uniform sampler2D uFromTexSampler;
+uniform sampler2D uToTexSampler;
+uniform float progress;
+uniform float ratio;      // viewport aspect ratio, provided by the host program
+uniform vec2 center;
+uniform float rotations;
+uniform float scale;
+uniform vec4 backColor;
+in vec2 vTexCoord;
+out vec4 fragColor;
+vec4 getFromColor(vec2 uv) { return texture(uFromTexSampler, uv); }
+vec4 getToColor(vec2 uv) { return texture(uToTexSampler, uv); }
+// Author: Fernando Kuteken
+// License: MIT
+// Description: The outgoing image spins and zooms while fading to the incoming one, over a background color
+// Tags: rotate, zoom, fade
+
+#define PI 3.14159265359
+
+// @param Center of the rotation
+// @param Number of turns
+// @param Maximum zoom
+// @color Background color
+
+vec4 transition (vec2 uv) {
+  
+  vec2 difference = uv - center;
+  vec2 dir = normalize(difference);
+  float dist = length(difference);
+  
+  float angle = 2.0 * PI * rotations * progress;
+  
+  float c = cos(angle);
+  float s = sin(angle);
+  
+  float currentScale = mix(scale, 1.0, 2.0 * abs(progress - 0.5));
+  
+  vec2 rotatedDir = vec2(dir.x  * c - dir.y * s, dir.x * s + dir.y * c);
+  vec2 rotatedUv = center + rotatedDir * dist / currentScale;
+  
+  if (rotatedUv.x < 0.0 || rotatedUv.x > 1.0 ||
+      rotatedUv.y < 0.0 || rotatedUv.y > 1.0)
+    return backColor;
+    
+  return mix(getFromColor(rotatedUv), getToColor(rotatedUv), progress);
+}
+void main() { fragColor = transition(vTexCoord); }

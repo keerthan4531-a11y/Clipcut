@@ -1577,6 +1577,12 @@
     <string name="panel_transition_active">Transition live</string>
     <string name="panel_transition_pick_one">Pick a style</string>
     <string name="panel_transition_summary_title">Current handoff</string>
+    <string name="transition_gl_title">Transition library</string>
+    <string name="transition_gl_subtitle">%1$d cinematic GLSL transitions, rendered on the GPU</string>
+    <string name="transition_gl_search">Search transitions</string>
+    <string name="transition_gl_all">All</string>
+    <string name="transition_gl_count">Showing %1$d of %2$d — search or pick a tag to narrow</string>
+    <string name="transition_gl_empty">No transitions match that search</string>
     <string name="panel_transition_summary_description">Choose a transition style and tune its timing to shape how shots hand off.</string>
     <string name="panel_transition_presets_title">Transition styles</string>
     <string name="panel_transition_presets_description">Start with a clean move, then slow it down only as much as the cut needs.</string>

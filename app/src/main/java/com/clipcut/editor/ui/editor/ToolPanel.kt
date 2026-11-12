@@ -18,6 +18,7 @@ import androidx.compose.material.icons.automirrored.filled.ViewList
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
+import com.clipcut.editor.engine.gltransition.GlTransitionCatalog
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -1487,6 +1488,7 @@ private fun CropPresetCard(
 fun TransitionPicker(
     onTransitionSelected: (TransitionType) -> Unit,
     onRemoveTransition: () -> Unit,
+    onGlTransitionSelected: (String) -> Unit = {},
     onDurationChanged: (Long) -> Unit,
     modifier: Modifier = Modifier,
     onDurationDragStarted: () -> Unit = {},
@@ -1593,7 +1595,8 @@ fun TransitionPicker(
                     TransitionType.entries.forEach { type ->
                         TransitionOptionCard(
                             type = type,
-                            isActive = currentTransition?.type == type,
+                            isActive = currentTransition?.type == type &&
+                                currentTransition.glTransitionId == null,
                             onClick = { onTransitionSelected(type) },
                             modifier = Modifier.width(cardWidth)
                         )
@@ -1601,6 +1604,12 @@ fun TransitionPicker(
                 }
             }
         }
+
+        Spacer(modifier = Modifier.height(14.dp))
+        GlTransitionLibraryCard(
+            selectedId = currentTransition?.glTransitionId,
+            onSelect = onGlTransitionSelected
+        )
 
         if (currentTransition != null) {
             Spacer(modifier = Modifier.height(12.dp))
@@ -1956,3 +1965,152 @@ private fun formatTextOverlayRange(overlay: TextOverlay): String {
     val endSec = overlay.endTimeMs / 1000f
     return String.format(Locale.US, "%.1fs — %.1fs", startSec, endSec)
 }
+
+/**
+ * Browser for the bundled gl-transitions shaders (212 of them, MIT).
+ *
+ * Deliberately capped: a [FlowRow] is not lazy, so composing every match would stall the
+ * sheet on a low-end device. The first [GL_RESULT_LIMIT] matches are shown and the counter
+ * tells the user to narrow the search instead of silently truncating.
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun GlTransitionLibraryCard(
+    selectedId: String?,
+    onSelect: (String) -> Unit
+) {
+    val semanticColors = LocalClipCutColors.current
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val catalogue = remember(context) {
+        runCatching { GlTransitionCatalog.all(context) }.getOrDefault(emptyList())
+    }
+    val tags = remember(catalogue) {
+        catalogue.flatMap { it.tags }
+            .groupingBy { it }
+            .eachCount()
+            .entries
+            .filter { it.value >= 8 }
+            .sortedWith(compareByDescending<Map.Entry<String, Int>> { it.value }.thenBy { it.key })
+            .take(10)
+            .map { it.key }
+    }
+    var query by remember { mutableStateOf("") }
+    var activeTag by remember { mutableStateOf<String?>(null) }
+    val results = remember(catalogue, query, activeTag) {
+        val q = query.trim().lowercase()
+        catalogue.filter { def ->
+            (activeTag == null || def.tags.contains(activeTag)) &&
+                (q.isEmpty() ||
+                    def.displayName.lowercase().contains(q) ||
+                    def.tags.any { it.contains(q) })
+        }
+    }
+
+    PremiumPanelCard(accent = ClipCutAccents.Mauve) {
+        Text(
+            text = stringResource(R.string.transition_gl_title),
+            color = semanticColors.text,
+            style = MaterialTheme.typography.titleMedium
+        )
+        Text(
+            text = stringResource(R.string.transition_gl_subtitle, catalogue.size),
+            color = semanticColors.subtext,
+            style = MaterialTheme.typography.bodySmall
+        )
+        Spacer(modifier = Modifier.height(10.dp))
+        OutlinedTextField(
+            value = query,
+            onValueChange = { query = it },
+            modifier = Modifier.fillMaxWidth(),
+            singleLine = true,
+            placeholder = { Text(stringResource(R.string.transition_gl_search)) }
+        )
+        if (tags.isNotEmpty()) {
+            Spacer(modifier = Modifier.height(8.dp))
+            FlowRow(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                val chipTags = listOf<String?>(null) + tags
+                chipTags.forEach { tag ->
+                    val selected = activeTag == tag
+                    Surface(
+                        onClick = { activeTag = tag },
+                        color = if (selected) ClipCutAccents.Mauve.copy(alpha = 0.22f) else semanticColors.panelHighest,
+                        shape = RoundedCornerShape(Radius.lg),
+                        border = BorderStroke(1.dp, semanticColors.cardStroke)
+                    ) {
+                        Text(
+                            text = tag ?: stringResource(R.string.transition_gl_all),
+                            color = if (selected) ClipCutAccents.Mauve else semanticColors.subtext,
+                            style = MaterialTheme.typography.labelMedium,
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                        )
+                    }
+                }
+            }
+        }
+        Spacer(modifier = Modifier.height(10.dp))
+        if (results.isEmpty()) {
+            Text(
+                text = stringResource(R.string.transition_gl_empty),
+                color = semanticColors.subtext,
+                style = MaterialTheme.typography.bodySmall
+            )
+        } else {
+            Text(
+                text = stringResource(
+                    R.string.transition_gl_count,
+                    minOf(results.size, GL_RESULT_LIMIT),
+                    results.size
+                ),
+                color = semanticColors.subtext,
+                style = MaterialTheme.typography.labelSmall
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            FlowRow(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                results.take(GL_RESULT_LIMIT).forEach { def ->
+                    val selected = selectedId == def.id
+                    Surface(
+                        onClick = { onSelect(def.id) },
+                        color = semanticColors.panelHighest,
+                        shape = RoundedCornerShape(Radius.xl),
+                        border = BorderStroke(
+                            width = 1.dp,
+                            color = if (selected) {
+                                ClipCutAccents.Mauve.copy(alpha = 0.55f)
+                            } else {
+                                semanticColors.cardStroke
+                            }
+                        ),
+                        modifier = Modifier.width(132.dp)
+                    ) {
+                        Column(modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp)) {
+                            Text(
+                                text = def.displayName,
+                                color = if (selected) ClipCutAccents.Mauve else semanticColors.text,
+                                style = MaterialTheme.typography.labelLarge,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            Text(
+                                text = def.tags.firstOrNull().orEmpty(),
+                                color = semanticColors.subtext,
+                                style = MaterialTheme.typography.labelSmall,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+private const val GL_RESULT_LIMIT = 60

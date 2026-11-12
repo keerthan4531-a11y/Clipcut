@@ -2043,6 +2043,65 @@ class VideoEngine @Inject constructor(
         return builder.build()
     }
 
+    /**
+     * Last visible frame of the clip that precedes [clip] on the same track.
+     *
+     * Used as the "from" image for bundled gl-transitions shaders. Deliberately downscaled:
+     * the transition shader only ever samples it through warped coordinates, so a ~640 px
+     * plate costs under a megabyte instead of a full-resolution bitmap per clip. Any failure
+     * (unsupported codec, missing permission, retriever throw) yields null and the effect
+     * falls back to fading in from black.
+     */
+    private fun capturePreviousClipFrame(
+        clip: Clip,
+        tracks: List<Track>
+    ): android.graphics.Bitmap? {
+        val track = tracks.firstOrNull { t -> t.clips.any { it.id == clip.id } } ?: return null
+        val index = track.clips.indexOfFirst { it.id == clip.id }
+        if (index <= 0) return null
+        val previous = track.clips[index - 1]
+        val timeMs = (previous.trimStartMs + previous.durationMs - 1L).coerceAtLeast(0L)
+        val retriever = android.media.MediaMetadataRetriever()
+        return try {
+            retriever.setDataSource(context, previous.sourceUri)
+            val frame = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O_MR1) {
+                retriever.getScaledFrameAtTime(
+                    timeMs * 1000L,
+                    android.media.MediaMetadataRetriever.OPTION_CLOSEST,
+                    FROM_FRAME_MAX_WIDTH,
+                    FROM_FRAME_MAX_HEIGHT
+                )
+            } else {
+                retriever.getFrameAtTime(
+                    timeMs * 1000L,
+                    android.media.MediaMetadataRetriever.OPTION_CLOSEST
+                )?.let { raw ->
+                    val scale = minOf(
+                        FROM_FRAME_MAX_WIDTH.toFloat() / raw.width.coerceAtLeast(1),
+                        FROM_FRAME_MAX_HEIGHT.toFloat() / raw.height.coerceAtLeast(1)
+                    )
+                    if (scale >= 1f) {
+                        raw
+                    } else {
+                        val scaled = android.graphics.Bitmap.createScaledBitmap(
+                            raw,
+                            (raw.width * scale).toInt().coerceAtLeast(1),
+                            (raw.height * scale).toInt().coerceAtLeast(1),
+                            true
+                        )
+                        if (scaled !== raw) raw.recycle()
+                        scaled
+                    }
+                }
+            }
+            frame?.takeIf { !it.isRecycled && it.width > 0 && it.height > 0 }
+        } catch (_: Throwable) {
+            null
+        } finally {
+            try { retriever.release() } catch (_: Throwable) { }
+        }
+    }
+
     @androidx.annotation.OptIn(UnstableApi::class)
     private fun buildEditedMediaItem(
         clip: Clip,
@@ -2070,6 +2129,16 @@ class VideoEngine @Inject constructor(
                 track.type == TrackType.AUDIO && track.clips.any { it.id == linkedId }
             }
         } == true
+
+        // gl-transitions shaders blend two sources; Media3 only hands us the incoming frame,
+        // so the outgoing clip's last frame is captured once here (only for clips that
+        // actually use one of those shaders, so existing projects pay nothing).
+        val glTransitionFromFrame: android.graphics.Bitmap? =
+            if (clip.headTransition?.glTransitionId != null) {
+                capturePreviousClipFrame(clip, tracks)
+            } else {
+                null
+            }
 
         val videoEffects = buildList<androidx.media3.common.Effect> {
             val clipTrackedObjects = trackedObjects.filter { it.sourceClipId == clip.id && it.isEnabled }
@@ -2118,7 +2187,7 @@ class VideoEngine @Inject constructor(
 
             if (PreviewRenderPolicy.includesTransitions(previewMode)) {
                 clip.headTransition?.let {
-                    add(EffectBuilder.buildTransitionEffect(it, degradationLedger))
+                    add(EffectBuilder.buildTransitionEffect(it, degradationLedger, glTransitionFromFrame))
                 }
                 nextClipTransition?.let {
                     add(EffectBuilder.buildTransitionOutEffect(it, clip.durationMs, degradationLedger))
@@ -3163,6 +3232,12 @@ class VideoEngine @Inject constructor(
         previewCompositionPlan = PreviewCompositionPlan.create(emptyList())
         clearThumbnailCache()
         healthScope.cancel()
+    }
+
+    private companion object {
+        /** Longest edge of the frozen "from" plate fed to gl-transitions shaders. */
+        const val FROM_FRAME_MAX_WIDTH = 960
+        const val FROM_FRAME_MAX_HEIGHT = 960
     }
 
 }

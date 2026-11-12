@@ -23,6 +23,7 @@ import com.clipcut.editor.model.Effect
 import com.clipcut.editor.model.EffectType
 import com.clipcut.editor.model.TrackType
 import com.clipcut.editor.model.Transition
+import com.clipcut.editor.model.TransitionType
 import com.clipcut.editor.ui.ClipCutTestTags
 import com.clipcut.editor.ui.export.ExportSheet
 import com.clipcut.editor.ui.export.ExportSheetPresentation
@@ -147,6 +148,15 @@ fun BoxScope.EditorPrimaryPanelHost(
                 onTransitionSelected = { type ->
                     val clipId = state.selectedClipId ?: return@TransitionPicker
                     viewModel.setTransition(clipId, Transition(type = type))
+                },
+                onGlTransitionSelected = { id ->
+                    val clipId = state.selectedClipId ?: return@TransitionPicker
+                    // The gl-transitions shader fully drives the visual; DISSOLVE is stored
+                    // only as the fallback for builds/projects that predate the catalogue.
+                    viewModel.setTransition(
+                        clipId,
+                        Transition(type = TransitionType.DISSOLVE, glTransitionId = id)
+                    )
                 },
                 onRemoveTransition = {
                     val clipId = state.selectedClipId ?: return@TransitionPicker

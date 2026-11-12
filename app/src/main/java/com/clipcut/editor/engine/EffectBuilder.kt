@@ -1,7 +1,9 @@
 package com.clipcut.editor.engine
 
+import android.graphics.Bitmap
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.effect.*
+import com.clipcut.editor.engine.gltransition.GlTransitionEffect
 import com.clipcut.editor.engine.segmentation.SegmentationEngine
 import com.clipcut.editor.model.*
 
@@ -393,7 +395,19 @@ internal object EffectBuilder {
     fun buildTransitionEffect(
         transition: Transition,
         degradationLedger: RenderDegradationLedger? = null,
+        fromFrame: Bitmap? = null,
     ): androidx.media3.common.Effect {
+        // A bundled gl-transitions shader blends the incoming clip with a frozen frame of
+        // the outgoing clip, so it renders through its own two-texture GL program rather
+        // than any of the single-input EffectShaders transitions.
+        transition.glTransitionId?.let { id ->
+            return GlTransitionEffect(
+                transitionId = id,
+                fromFrame = fromFrame,
+                durationUs = transition.durationMs.coerceIn(1L, 2_147_000L) * 1000L,
+                easing = transition.easing,
+            )
+        }
         // Clamp durationMs before multiplying to avoid Float overflow at
         // pathological values (anything above ~25 days multiplied by 1000f
         // lands on Float.POSITIVE_INFINITY, which poisons every division
