@@ -230,7 +230,7 @@ private class GlTransitionShaderProgram(
 
     private fun uploadFromFrame(): Int {
         val ids = IntArray(1)
-        GLES30.glGenTextures(1, ids)
+        GLES30.glGenTextures(1, ids, 0)
         GLES30.glBindTexture(GLES30.GL_TEXTURE_2D, ids[0])
         GLES30.glTexParameteri(GLES30.GL_TEXTURE_2D, GLES30.GL_TEXTURE_MIN_FILTER, GLES30.GL_LINEAR)
         GLES30.glTexParameteri(GLES30.GL_TEXTURE_2D, GLES30.GL_TEXTURE_MAG_FILTER, GLES30.GL_LINEAR)
