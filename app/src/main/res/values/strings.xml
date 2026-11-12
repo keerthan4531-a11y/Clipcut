@@ -1578,6 +1578,11 @@
     <string name="panel_transition_pick_one">Pick a style</string>
     <string name="panel_transition_summary_title">Current handoff</string>
     <string name="transition_gl_title">Transition library</string>
+    <string name="effect_browser_title">Browse effects</string>
+    <string name="effect_browser_subtitle">Tap any effect to add it to the selected clip</string>
+    <string name="effect_browser_effects">Effects</string>
+    <string name="effect_browser_looks">Looks</string>
+    <string name="effect_browser_search">Search effects and looks</string>
     <string name="transition_gl_subtitle">%1$d cinematic GLSL transitions, rendered on the GPU</string>
     <string name="transition_gl_search">Search transitions</string>
     <string name="transition_gl_all">All</string>

@@ -12,6 +12,9 @@ data class ColorGrade(
     val curves: ColorCurves = ColorCurves(),
     val hslQualifier: HslQualifier? = null,
     val lutPath: String? = null,
+    /** Id of a built-in LUT from [com.clipcut.editor.engine.LutPresets]; the file-based
+     *  [lutPath] still takes precedence when both are set. */
+    val lutPresetId: String? = null,
     val lutIntensity: Float = 1f,
     val colorMatchRef: String? = null
 )

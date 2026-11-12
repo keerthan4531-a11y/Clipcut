@@ -494,6 +494,12 @@ fun BoxScope.EditorUtilityPanelHost(
         EffectLibraryPanel(
             hasClipSelected = state.selectedClipId != null,
             hasCopiedEffects = state.copiedEffects.isNotEmpty(),
+            onEffectSelected = { type ->
+                state.selectedClipId?.let { clipId ->
+                    viewModel.addEffect(clipId, com.clipcut.editor.model.Effect(type = type))
+                }
+            },
+            onLutPresetSelected = { presetId -> viewModel.setClipLutPreset(presetId) },
             onExportEffects = { viewModel.exportClipEffects("exported_effects") },
             onImportEffects = { viewModel.showToast(context.getString(R.string.editor_use_file_picker_import)) },
             onCopyEffects = viewModel::copyEffects,

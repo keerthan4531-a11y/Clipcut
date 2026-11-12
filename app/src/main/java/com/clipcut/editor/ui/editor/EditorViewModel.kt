@@ -2339,6 +2339,8 @@ class EditorViewModel @Inject constructor(
     fun onLutFileSelected(uri: Uri) = colorGradingDelegate.onLutFileSelected(uri)
     fun setClipLut(lutPath: String) = colorGradingDelegate.setClipLut(lutPath)
 
+    fun setClipLutPreset(presetId: String?) = colorGradingDelegate.setClipLutPreset(presetId)
+
     // --- Audio Mixer (delegated) ---
     fun showAudioMixer() = audioMixerDelegate.showAudioMixer()
     fun hideAudioMixer() = audioMixerDelegate.hideAudioMixer()

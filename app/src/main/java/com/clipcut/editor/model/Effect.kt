@@ -44,14 +44,14 @@ enum class EffectType(val displayName: String, val category: EffectCategory) {
     POSTERIZE("Posterize", EffectCategory.FILTER),
     VIGNETTE("Vignette", EffectCategory.FILTER),
     SHARPEN("Sharpen", EffectCategory.FILTER),
-    FILM_GRAIN("Film Grain", EffectCategory.FILTER),
+    FILM_GRAIN("Film Grain", EffectCategory.ANIMATED),
     VINTAGE("Vintage", EffectCategory.FILTER),
     COOL_TONE("Cool Tone", EffectCategory.FILTER),
     WARM_TONE("Warm Tone", EffectCategory.FILTER),
     CYBERPUNK("Cyberpunk", EffectCategory.FILTER),
     NOIR("Noir", EffectCategory.FILTER),
-    VHS_RETRO("VHS/Retro", EffectCategory.FILTER),
-    LIGHT_LEAK("Light Leak", EffectCategory.FILTER),
+    VHS_RETRO("VHS/Retro", EffectCategory.ANIMATED),
+    LIGHT_LEAK("Light Leak", EffectCategory.ANIMATED),
 
     // Blur
     GAUSSIAN_BLUR("Gaussian Blur", EffectCategory.BLUR),
@@ -64,7 +64,7 @@ enum class EffectType(val displayName: String, val category: EffectCategory) {
     // Distortion
     FISHEYE("Fisheye", EffectCategory.DISTORTION),
     MIRROR("Mirror", EffectCategory.DISTORTION),
-    GLITCH("Glitch", EffectCategory.DISTORTION),
+    GLITCH("Glitch", EffectCategory.ANIMATED),
     PIXELATE("Pixelate", EffectCategory.DISTORTION),
     WAVE("Wave", EffectCategory.DISTORTION),
     CHROMATIC_ABERRATION("Chromatic Aberration", EffectCategory.DISTORTION),
@@ -75,7 +75,17 @@ enum class EffectType(val displayName: String, val category: EffectCategory) {
 
     // Speed
     SPEED("Speed", EffectCategory.SPEED),
-    REVERSE("Reverse", EffectCategory.SPEED);
+    REVERSE("Reverse", EffectCategory.SPEED),
+
+    // Animated
+    LENS_FLARE("Lens Flare", EffectCategory.ANIMATED),
+    SNOW("Snow", EffectCategory.ANIMATED),
+    RAIN("Rain", EffectCategory.ANIMATED),
+    SPARKS("Sparks", EffectCategory.ANIMATED),
+    BOKEH("Bokeh", EffectCategory.ANIMATED),
+    OLD_FILM("Old Film", EffectCategory.ANIMATED),
+    NEON_PULSE("Neon Pulse", EffectCategory.ANIMATED),
+    CAMERA_SHAKE("Camera Shake", EffectCategory.ANIMATED);
 
     companion object {
         fun defaultParams(type: EffectType): Map<String, Float> = when (type) {
@@ -109,6 +119,8 @@ enum class EffectType(val displayName: String, val category: EffectCategory) {
             POSTERIZE -> mapOf("levels" to 6f)
             VHS_RETRO -> mapOf("intensity" to 0.5f)
             LIGHT_LEAK -> mapOf("intensity" to 0.5f)
+            LENS_FLARE, SNOW, RAIN, SPARKS, BOKEH, OLD_FILM, NEON_PULSE, CAMERA_SHAKE ->
+                mapOf("intensity" to 0.5f)
             GRAYSCALE, SEPIA, INVERT, MIRROR, REVERSE -> emptyMap()
         }
 
@@ -178,7 +190,10 @@ enum class EffectCategory(val displayName: String) {
     BLUR("Blur"),
     DISTORTION("Distortion"),
     KEYING("Keying"),
-    SPEED("Speed")
+    SPEED("Speed"),
+
+    /** Time-driven effects: motion comes from the frame timestamp, not user params. */
+    ANIMATED("Animated")
 }
 
 data class AudioEffect(

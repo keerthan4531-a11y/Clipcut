@@ -245,8 +245,9 @@ internal object EffectBuilder {
                 EffectShaders.sharpen(strength)
             }
             EffectType.FILM_GRAIN -> {
+                // Now time-driven: the grain reseeds every frame instead of sitting still.
                 val intensity = effect.params.safeParam("intensity", 0.1f, 0f, 1f)
-                EffectShaders.filmGrain(intensity)
+                AnimatedEffectShaders.filmGrain(intensity)
             }
             EffectType.GAUSSIAN_BLUR -> {
                 val radius = effect.params.safeParam("radius", 5f, 1f, 25f)
@@ -284,7 +285,7 @@ internal object EffectBuilder {
             }
             EffectType.GLITCH -> {
                 val intensity = effect.params.safeParam("intensity", 0.5f, 0f, 1f)
-                EffectShaders.glitch(intensity)
+                AnimatedEffectShaders.glitch(intensity)
             }
             EffectType.PIXELATE -> {
                 val size = effect.params.safeParam("size", 10f, 2f, 50f)
@@ -320,12 +321,36 @@ internal object EffectBuilder {
             }
             EffectType.VHS_RETRO -> {
                 val intensity = effect.params.safeParam("intensity", 0.5f, 0f, 1f)
-                EffectShaders.vhsRetro(intensity)
+                AnimatedEffectShaders.vhs(intensity)
             }
             EffectType.LIGHT_LEAK -> {
                 val intensity = effect.params.safeParam("intensity", 0.5f, 0f, 1f)
-                EffectShaders.lightLeak(intensity)
+                AnimatedEffectShaders.lightLeak(intensity)
             }
+            EffectType.LENS_FLARE -> AnimatedEffectShaders.lensFlare(
+                effect.params.safeParam("intensity", 0.5f, 0f, 1f)
+            )
+            EffectType.SNOW -> AnimatedEffectShaders.snow(
+                effect.params.safeParam("intensity", 0.5f, 0f, 1f)
+            )
+            EffectType.RAIN -> AnimatedEffectShaders.rain(
+                effect.params.safeParam("intensity", 0.5f, 0f, 1f)
+            )
+            EffectType.SPARKS -> AnimatedEffectShaders.sparks(
+                effect.params.safeParam("intensity", 0.5f, 0f, 1f)
+            )
+            EffectType.BOKEH -> AnimatedEffectShaders.bokeh(
+                effect.params.safeParam("intensity", 0.5f, 0f, 1f)
+            )
+            EffectType.OLD_FILM -> AnimatedEffectShaders.oldFilm(
+                effect.params.safeParam("intensity", 0.5f, 0f, 1f)
+            )
+            EffectType.NEON_PULSE -> AnimatedEffectShaders.neonPulse(
+                effect.params.safeParam("intensity", 0.5f, 0f, 1f)
+            )
+            EffectType.CAMERA_SHAKE -> AnimatedEffectShaders.cameraShake(
+                effect.params.safeParam("intensity", 0.5f, 0f, 1f)
+            )
             EffectType.SPEED, EffectType.REVERSE -> null
         }
         return if (built is ShaderEffect && degradationLedger != null) {
@@ -374,6 +399,13 @@ internal object EffectBuilder {
                     safeEffectFloat(hsl.adjustSat, 0f, -1f, 1f),
                     safeEffectFloat(hsl.adjustLum, 0f, -1f, 1f)
                 ))
+            }
+            // Built-in look chosen from the filter browser: synthesised on device, so it
+            // costs no APK size and needs no file import step.
+            grade.lutPresetId?.let { presetId ->
+                LutPresets.lut3d(presetId)?.let { lut ->
+                    add(LutEngine.createLutEffect(lut, safeEffectFloat(grade.lutIntensity, 1f, 0f, 1f)))
+                }
             }
             grade.lutPath?.let { path ->
                 val lutFile = java.io.File(path)

@@ -24,6 +24,15 @@ import androidx.compose.material.icons.filled.Upload
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.text.style.TextOverflow
+import com.clipcut.editor.engine.LutPresets
+import com.clipcut.editor.model.EffectCategory
+import com.clipcut.editor.model.EffectType
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -42,6 +51,8 @@ fun EffectLibraryPanel(
     hasClipSelected: Boolean,
     hasCopiedEffects: Boolean,
     onExportEffects: () -> Unit,
+    onEffectSelected: (EffectType) -> Unit = {},
+    onLutPresetSelected: (String) -> Unit = {},
     onImportEffects: () -> Unit,
     onCopyEffects: () -> Unit,
     onPasteEffects: () -> Unit,
@@ -59,6 +70,11 @@ fun EffectLibraryPanel(
         scrollable = true,
         closeContentDescription = stringResource(R.string.effect_library_close_cd)
     ) {
+        FilterBrowserCard(
+            onEffectSelected = onEffectSelected,
+            onLutPresetSelected = onLutPresetSelected
+        )
+        Spacer(modifier = Modifier.height(12.dp))
         PremiumPanelCard(accent = ClipCutAccents.Mauve) {
             Text(
                 text = stringResource(R.string.panel_effect_library_workflow_title),
@@ -301,5 +317,168 @@ private fun EffectLibraryActionCard(
                 }
             }
         }
+    }
+}
+
+/**
+ * The actual filter browser: every effect ClipCut can render, grouped by category, plus the
+ * built-in colour looks. Selecting a card applies it to the selected clip immediately.
+ *
+ * Cards are plain text buttons rather than live thumbnails: a 17³ LUT or a 12-branch shader
+ * grid rendered per card on a mid-range GPU costs more than it is worth while the sheet is
+ * open, and the previous panel had no way to reach these effects at all.
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun FilterBrowserCard(
+    onEffectSelected: (EffectType) -> Unit,
+    onLutPresetSelected: (String) -> Unit
+) {
+    val semanticColors = LocalClipCutColors.current
+    var query by remember { mutableStateOf("") }
+    var showLooks by remember { mutableStateOf(false) }
+    val needle = query.trim().lowercase()
+
+    PremiumPanelCard(accent = ClipCutAccents.Mauve) {
+        Text(
+            text = stringResource(R.string.effect_browser_title),
+            color = semanticColors.text,
+            style = MaterialTheme.typography.titleMedium
+        )
+        Text(
+            text = stringResource(R.string.effect_browser_subtitle),
+            color = semanticColors.subtext,
+            style = MaterialTheme.typography.bodySmall
+        )
+        Spacer(modifier = Modifier.height(10.dp))
+        FlowRow(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            BrowserToggle(
+                label = stringResource(R.string.effect_browser_effects),
+                selected = !showLooks,
+                onClick = { showLooks = false }
+            )
+            BrowserToggle(
+                label = stringResource(R.string.effect_browser_looks),
+                selected = showLooks,
+                onClick = { showLooks = true }
+            )
+        }
+        Spacer(modifier = Modifier.height(10.dp))
+        OutlinedTextField(
+            value = query,
+            onValueChange = { query = it },
+            modifier = Modifier.fillMaxWidth(),
+            singleLine = true,
+            placeholder = { Text(stringResource(R.string.effect_browser_search)) }
+        )
+        Spacer(modifier = Modifier.height(10.dp))
+
+        if (showLooks) {
+            LutPresets.categories.forEach { category ->
+                val looks = LutPresets.byCategory(category).filter {
+                    needle.isEmpty() ||
+                        it.displayName.lowercase().contains(needle) ||
+                        it.description.lowercase().contains(needle)
+                }
+                if (looks.isNotEmpty()) {
+                    Text(
+                        text = category,
+                        color = semanticColors.subtext,
+                        style = MaterialTheme.typography.labelMedium
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
+                    FlowRow(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        looks.forEach { preset ->
+                            BrowserChip(
+                                label = preset.displayName,
+                                onClick = { onLutPresetSelected(preset.id) }
+                            )
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(10.dp))
+                }
+            }
+        } else {
+            EffectCategory.entries.forEach { category ->
+                val effects = EffectType.entries.filter {
+                    it.category == category &&
+                        (needle.isEmpty() || it.displayName.lowercase().contains(needle))
+                }
+                if (effects.isNotEmpty()) {
+                    Text(
+                        text = category.displayName,
+                        color = semanticColors.subtext,
+                        style = MaterialTheme.typography.labelMedium
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
+                    FlowRow(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        effects.forEach { effect ->
+                            BrowserChip(
+                                label = effect.displayName,
+                                onClick = { onEffectSelected(effect) }
+                            )
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(10.dp))
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun BrowserToggle(
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit
+) {
+    val semanticColors = LocalClipCutColors.current
+    Surface(
+        onClick = onClick,
+        color = if (selected) ClipCutAccents.Mauve.copy(alpha = 0.22f) else semanticColors.panelHighest,
+        shape = RoundedCornerShape(10.dp),
+        border = BorderStroke(1.dp, semanticColors.cardStroke)
+    ) {
+        Text(
+            text = label,
+            color = if (selected) ClipCutAccents.Mauve else semanticColors.subtext,
+            style = MaterialTheme.typography.labelMedium,
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+        )
+    }
+}
+
+@Composable
+private fun BrowserChip(
+    label: String,
+    onClick: () -> Unit
+) {
+    val semanticColors = LocalClipCutColors.current
+    Surface(
+        onClick = onClick,
+        color = semanticColors.panelHighest,
+        shape = RoundedCornerShape(10.dp),
+        border = BorderStroke(1.dp, semanticColors.cardStroke),
+        modifier = Modifier.width(124.dp)
+    ) {
+        Text(
+            text = label,
+            color = semanticColors.text,
+            style = MaterialTheme.typography.labelLarge,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp)
+        )
     }
 }

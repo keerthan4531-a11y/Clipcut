@@ -98,6 +98,14 @@ class ColorGradingDelegate(
         }
     }
 
+    /** Applies one of the built-in looks from [com.clipcut.editor.engine.LutPresets]. */
+    fun setClipLutPreset(presetId: String?) {
+        val clip = getSelectedClip() ?: return
+        saveUndoState("Apply look")
+        val currentGrade = clip.colorGrade ?: ColorGrade()
+        updateClipColorGrade(currentGrade.copy(lutPresetId = presetId, lutPath = null))
+    }
+
     fun setClipLut(lutPath: String) {
         val clip = getSelectedClip() ?: return
         saveUndoState("Apply LUT")

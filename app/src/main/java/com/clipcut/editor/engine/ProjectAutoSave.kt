@@ -1570,6 +1570,7 @@ data class AutoSaveState(
                 putSafeFloat("gainR", g.gainR, default = 1f); putSafeFloat("gainG", g.gainG, default = 1f); putSafeFloat("gainB", g.gainB, default = 1f)
                 putSafeFloat("offsetR", g.offsetR); putSafeFloat("offsetG", g.offsetG); putSafeFloat("offsetB", g.offsetB)
                 g.lutPath?.let { put("lutPath", it) }
+                g.lutPresetId?.let { put("lutPresetId", it) }
                 putSafeFloat("lutIntensity", g.lutIntensity, default = 1f)
                 g.colorMatchRef?.let { put("colorMatchRef", it) }
                 put("curves", serializeColorCurves(g.curves))
@@ -2115,6 +2116,10 @@ data class AutoSaveState(
                 gainR = safeFloat(json.optDouble("gainR", 1.0), 1f), gainG = safeFloat(json.optDouble("gainG", 1.0), 1f), gainB = safeFloat(json.optDouble("gainB", 1.0), 1f),
                 offsetR = safeFloat(json.optDouble("offsetR", 0.0), 0f), offsetG = safeFloat(json.optDouble("offsetG", 0.0), 0f), offsetB = safeFloat(json.optDouble("offsetB", 0.0), 0f),
                 lutPath = json.optString("lutPath", "").takeIf { it.isNotEmpty() },
+                // Only ids that exist in the app's own preset table are honoured.
+                lutPresetId = json.optString("lutPresetId", "").takeIf {
+                    it.isNotEmpty() && com.clipcut.editor.engine.LutPresets.find(it) != null
+                },
                 lutIntensity = safeFloat(json.optDouble("lutIntensity", 1.0), 1f).coerceIn(0f, 1f),
                 colorMatchRef = json.optString("colorMatchRef", "").takeIf { it.isNotEmpty() },
                 curves = json.optJSONObject("curves")?.let { deserializeColorCurves(it) } ?: ColorCurves(),

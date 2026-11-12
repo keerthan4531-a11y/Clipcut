@@ -1772,6 +1772,7 @@ private fun effectAccent(category: EffectCategory): Color = when (category) {
     EffectCategory.DISTORTION -> ClipCutAccents.Peach
     EffectCategory.KEYING -> ClipCutAccents.Green
     EffectCategory.SPEED -> ClipCutAccents.Yellow
+    EffectCategory.ANIMATED -> ClipCutAccents.Red
 }
 
 private fun effectIcon(category: EffectCategory): ImageVector = when (category) {
@@ -1781,6 +1782,7 @@ private fun effectIcon(category: EffectCategory): ImageVector = when (category) 
     EffectCategory.DISTORTION -> Icons.Default.Waves
     EffectCategory.KEYING -> Icons.Default.Wallpaper
     EffectCategory.SPEED -> Icons.Default.Speed
+    EffectCategory.ANIMATED -> Icons.Default.PlayArrow
 }
 
 private fun transitionIcon(type: TransitionType): ImageVector = when (type) {
